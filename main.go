@@ -24,9 +24,10 @@ func main() {
 	key := Str("test:")
 	value := Alt(null, _true, _false)
 
-	var jsonParse = Alt(value, Seq(lbrace, key, value, rbrace), Seq(lbracket, value, rbracket))
+	jsonParse := Alt(value, Seq(lbrace, key, value, rbrace), Seq(lbracket, value, rbracket))
 
-	var result1 = jsonParse("{test:null}", 0)
+	target := "{test:null}"
+	result1 := jsonParse(&target, 0)
 	fmt.Print(lexerkit.Stringify(result1))
 
 }

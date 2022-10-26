@@ -1,43 +1,42 @@
 package lexerkit
 
 import (
-	"fmt"
 	"regexp"
 )
 
-type Parser func(target string, index int) *Result
+type Parser func(target *string, index int) *Result
 
 // パーサを遅延評価で読み込むパーサ
 func Lazy(fn func() Parser) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		return fn()(target, index)
 	}
 }
 
 // 必ず成功し、与えたvalueを持ったResultを返すパーサ
 func Succeed(value string) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		return MakeSuccess(index, value)
 	}
 }
 
 // 必ず失敗し、与えたvalueを持ったResultを返すパーサ
 func Failed(expected []string) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		return MakeFailure(index, expected)
 	}
 }
 
 // 与えられた文字列にマッチするパーサ
 func Str(expected string) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		var length = len(expected)
 
-		if index+length > len(target) {
+		if index+length > len(*target) {
 			return MakeEmpty(false, index)
 		}
 
-		if target[index:index+length] == expected {
+		if (*target)[index:index+length] == expected {
 			return MakeSuccess(index+length, expected)
 		} else {
 			return MakeFailure(index, []string{"'" + expected + "'"})
@@ -47,14 +46,14 @@ func Str(expected string) Parser {
 
 // 複数回マッチするパーサ
 func Many(parser Parser) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		var children = []*Result{}
 		for {
 			var parsed = parser(target, index)
 
-			if parsed.Status() {
+			if parsed.status {
 				children = append(children, parsed)
-				index = parsed.Index()
+				index = parsed.index
 			} else {
 				break
 			}
@@ -66,15 +65,13 @@ func Many(parser Parser) Parser {
 
 // いずれかのパーサがマッチするパーサ
 func Alt(parsers ...Parser) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		for _, parser := range parsers {
 			var parsed = parser(target, index)
 
-			if parsed.Status() {
-				fmt.Printf("debug: ok, length: %d\n", len(parsers))
+			if parsed.status {
 				return parsed
 			}
-			fmt.Println("debug: ng")
 		}
 
 		return MakeFailure(index, []string{"no any parsers matched"})
@@ -88,17 +85,17 @@ func Or(left Parser, right Parser) Parser {
 
 // 与えられた順のパーサが全てマッチするパーサ
 func Seq(parsers ...Parser) Parser {
-	return func(target string, index int) *Result {
+	return func(target *string, index int) *Result {
 		var children = []*Result{}
 
 		for _, parser := range parsers {
 			var parsed = parser(target, index)
 
-			if parsed.Status() {
+			if parsed.status {
 				children = append(children, parsed)
-				index = parsed.Index()
+				index = parsed.index
 			} else {
-				return MakeFailure(index, parsed.Expected())
+				return MakeFailure(index, parsed.expected)
 			}
 		}
 
@@ -108,8 +105,8 @@ func Seq(parsers ...Parser) Parser {
 
 // 与えられた正規表現にマッチするパーサ
 func Regexp(reg *regexp.Regexp) Parser {
-	return func(target string, index int) *Result {
-		var matched = reg.FindString(target[index:])
+	return func(target *string, index int) *Result {
+		var matched = reg.FindString((*target)[index:])
 
 		if matched != "" {
 			return MakeSuccess(index+len(matched), matched)
@@ -122,6 +119,31 @@ func Regexp(reg *regexp.Regexp) Parser {
 // 与えられた正規表現文字列にマッチするパーサ
 func Regstr(regstr string) Parser {
 	return Regexp(regexp.MustCompile(regstr))
+}
+
+// Resultをmapperによって変更するパーサ
+func Map(mapper func(result *Result) *Result, parser Parser) Parser {
+	return func(target *string, index int) *Result {
+		return mapper(parser(target, index))
+	}
+}
+
+// SeqのResultをmapperによって変更するパーサ
+func SeqMap(mapper func(result *Result) *Result, parsers ...Parser) Parser {
+	return Map(mapper, Seq(parsers...))
+}
+
+// セパレータで区切られた部分をパースするパーサ
+func SepBy1(parser Parser, separator Parser) Parser {
+	pairs := Many(Seq(separator, parser))
+	return SeqMap(func(result *Result) *Result {
+		resultNum := len(result.children)
+		results := make([]*Result, 0, resultNum)
+		for _, result := range result.children {
+			results = append(results, result.children[1])
+		}
+		return MakeContainer(len(result.children), results)
+	}, parser, pairs)
 }
 
 // 複数回マッチする
@@ -147,4 +169,35 @@ func (parser Parser) Seq(parsers ...Parser) Parser {
 // マッチしなくても良い
 func (parser Parser) Opt() Parser {
 	return Or(parser, Succeed(""))
+}
+
+// Resultを書き換える
+func (parser Parser) Map(mapper func(result *Result) *Result) Parser {
+	return Map(mapper, parser)
+}
+
+// パーサを加工する
+func (parser Parser) Thru(wrapper func(parser Parser) Parser) Parser {
+	return wrapper(parser)
+}
+
+// leftとrightに囲まれた部分のResultを返す
+func (parser Parser) Wrap(left Parser, right Parser) Parser {
+	return SeqMap(func(result *Result) *Result {
+		return result.children[1]
+	}, left, parser, right)
+}
+
+// 次のResultを返す
+func (parser Parser) Then(next Parser) Parser {
+	return SeqMap(func(result *Result) *Result {
+		return result.children[1]
+	}, parser, next)
+}
+
+// 次のResultを飛ばす
+func (parser Parser) Skip(next Parser) Parser {
+	return SeqMap(func(result *Result) *Result {
+		return result.children[0]
+	}, parser, next)
 }

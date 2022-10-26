@@ -21,12 +21,17 @@ type Result struct {
 	value      string
 }
 
-func (p *Result) Type() ResultTypes   { return p.resultType }
-func (p *Result) Status() bool        { return p.status }
-func (p *Result) Index() int          { return p.index }
-func (p *Result) Expected() []string  { return p.expected }
-func (p *Result) Children() []*Result { return p.children }
-func (p *Result) Value() string       { return p.value }
+func NewResult() *Result {
+	return &Result{
+		resultType: Content,
+		status:     true,
+		index:      0,
+		expected:   []string{},
+		children:   []*Result{},
+		value:      "",
+	}
+}
+
 func (p *Result) IsEmpty() bool {
 	switch p.resultType {
 	case Container:
@@ -38,31 +43,6 @@ func (p *Result) IsEmpty() bool {
 	}
 }
 
-func (p *Result) SetType(resultType ResultTypes) *Result {
-	p.resultType = resultType
-	return p
-}
-func (p *Result) SetStatus(status bool) *Result {
-	p.status = status
-	return p
-}
-func (p *Result) SetIndex(index int) *Result {
-	p.index = index
-	return p
-}
-func (p *Result) SetExpected(expected []string) *Result {
-	p.expected = expected
-	return p
-}
-func (p *Result) SetChildren(children []*Result) *Result {
-	p.children = children
-	return p
-}
-func (p *Result) SetValue(value string) *Result {
-	p.value = value
-	return p
-}
-
 func MakeContent(
 	index int,
 	expected []string,
@@ -71,7 +51,7 @@ func MakeContent(
 ) *Result {
 	return &Result{
 		resultType: "content",
-		status:     false,
+		status:     true,
 		index:      index,
 		expected:   expected,
 		children:   []*Result{},
@@ -132,12 +112,12 @@ func MergeResults(result Result, last Result) *Result {
 	}
 
 	return &Result{
-		resultType: result.Type(),
-		status:     result.Status(),
-		index:      result.Index(),
-		expected:   result.Expected(),
-		children:   result.Children(),
-		value:      result.Value(),
+		resultType: result.resultType,
+		status:     result.status,
+		index:      last.index,
+		expected:   result.expected,
+		children:   result.children,
+		value:      result.value,
 	}
 }
 
@@ -154,14 +134,14 @@ func Stringify(result *Result) string {
 		buffer = buffer + "{\n"
 
 		buffer = tab(buffer, nest+1)
-		buffer = buffer + "\"status\": " + strconv.FormatBool(result.Status()) + ",\n"
+		buffer = buffer + "\"status\": " + strconv.FormatBool(result.status) + ",\n"
 		buffer = tab(buffer, nest+1)
-		buffer = buffer + "\"index\": " + strconv.Itoa(result.Index()) + ",\n"
+		buffer = buffer + "\"index\": " + strconv.Itoa(result.index) + ",\n"
 
-		if result.Type() == "container" {
+		if result.resultType == "container" {
 			buffer = tab(buffer, nest+1)
 			buffer = buffer + "\"children\": [\n"
-			var children = result.Children()
+			var children = result.children
 			for _, child := range children {
 				buffer = loop(child, buffer, nest+2)
 			}
@@ -169,9 +149,9 @@ func Stringify(result *Result) string {
 			buffer = buffer + "],\n"
 		} else {
 			buffer = tab(buffer, nest+1)
-			buffer = buffer + "\"value\": \"" + result.Value() + "\",\n"
+			buffer = buffer + "\"value\": \"" + result.value + "\",\n"
 
-			var expected = result.Expected()
+			var expected = result.expected
 			buffer = tab(buffer, nest+1)
 			buffer = buffer + "\"expected\": [\n"
 			for _, elm := range expected {
