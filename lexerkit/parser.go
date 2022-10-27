@@ -21,13 +21,6 @@ func (dummy *DummyParser) Parser(target *string, index int) (*Result, error) {
 	return dummy.InternalParser(target, index)
 }
 
-// // パーサを遅延評価で読み込むパーサ
-// func Lazy(fn func() Parser) Parser {
-// 	return func(target *string, index int) (*Result, error) {
-// 		return fn()(target, index)
-// 	}
-// }
-
 // 必ず成功し、与えたvalueを持ったResultを返すパーサ
 func Succeed(value string) Parser {
 	return func(target *string, index int) (*Result, error) {
@@ -262,4 +255,16 @@ func (parser Parser) Skip(next Parser) Parser {
 
 		return MergeResults(result.children[0], result.children[1]), nil
 	}, parser, next)
+}
+
+// 名前をつける
+func (parser Parser) Name(name string) Parser {
+	return Map(func(result *Result, err error) (*Result, error) {
+		if err != nil {
+			return result, err
+		}
+
+		result.name = name
+		return result, nil
+	}, parser)
 }

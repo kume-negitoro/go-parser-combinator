@@ -13,6 +13,7 @@ const (
 )
 
 type Result struct {
+	name       string
 	resultType ResultTypes
 	status     bool
 	index      int
@@ -26,6 +27,7 @@ type ResultMapper func(result *Result, err error) (*Result, error)
 
 func NewResult() *Result {
 	return &Result{
+		name:       "",
 		resultType: Content,
 		status:     true,
 		index:      0,
@@ -53,6 +55,7 @@ func MakeContent(
 	value string,
 ) *Result {
 	return &Result{
+		name:       "",
 		resultType: "content",
 		status:     true,
 		index:      index,
@@ -67,6 +70,7 @@ func MakeContainer(
 	children []*Result,
 ) *Result {
 	return &Result{
+		name:       "",
 		resultType: "container",
 		status:     true,
 		index:      index,
@@ -78,6 +82,7 @@ func MakeContainer(
 
 func MakeEmpty(status bool, index int) *Result {
 	return &Result{
+		name:       "",
 		resultType: "content",
 		status:     status,
 		index:      index,
@@ -89,6 +94,7 @@ func MakeEmpty(status bool, index int) *Result {
 
 func MakeSuccess(index int, value string) *Result {
 	return &Result{
+		name:       "",
 		resultType: "content",
 		status:     true,
 		index:      index,
@@ -100,6 +106,7 @@ func MakeSuccess(index int, value string) *Result {
 
 func MakeFailure(index int, expected []string) *Result {
 	return &Result{
+		name:       "",
 		resultType: "content",
 		status:     false,
 		index:      index,
@@ -115,6 +122,7 @@ func MergeResults(result *Result, last *Result) *Result {
 	}
 
 	return &Result{
+		name:       result.name,
 		resultType: result.resultType,
 		status:     result.status,
 		index:      last.index,
@@ -134,6 +142,9 @@ func Stringify(result *Result) string {
 	var loop func(result *Result, buffer string, nest int) string
 	loop = func(result *Result, buffer string, nest int) string {
 		buffer = tab(buffer, nest)
+		if result.status && result.name != "" {
+			buffer = buffer + result.name + " "
+		}
 		buffer = buffer + "{\n"
 
 		buffer = tab(buffer, nest+1)
