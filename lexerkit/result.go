@@ -21,6 +21,9 @@ type Result struct {
 	value      string
 }
 
+// Resultを加工する関数の型
+type ResultMapper func(result *Result, err error) (*Result, error)
+
 func NewResult() *Result {
 	return &Result{
 		resultType: Content,
@@ -106,9 +109,9 @@ func MakeFailure(index int, expected []string) *Result {
 	}
 }
 
-func MergeResults(result Result, last Result) *Result {
+func MergeResults(result *Result, last *Result) *Result {
 	if result.index > last.index {
-		return &result
+		return result
 	}
 
 	return &Result{
@@ -125,7 +128,7 @@ type Success struct{ Result }
 type Failure struct{ Result }
 
 func Stringify(result *Result) string {
-	var tab = func(buffer string, n int) string {
+	tab := func(buffer string, n int) string {
 		return buffer + strings.Repeat("  ", n)
 	}
 	var loop func(result *Result, buffer string, nest int) string
@@ -141,7 +144,7 @@ func Stringify(result *Result) string {
 		if result.resultType == "container" {
 			buffer = tab(buffer, nest+1)
 			buffer = buffer + "\"children\": [\n"
-			var children = result.children
+			children := result.children
 			for _, child := range children {
 				buffer = loop(child, buffer, nest+2)
 			}
@@ -151,16 +154,17 @@ func Stringify(result *Result) string {
 			buffer = tab(buffer, nest+1)
 			buffer = buffer + "\"value\": \"" + result.value + "\",\n"
 
-			var expected = result.expected
-			buffer = tab(buffer, nest+1)
-			buffer = buffer + "\"expected\": [\n"
-			for _, elm := range expected {
-				buffer = tab(buffer, nest+2)
-				buffer = buffer + "\"" + elm + "\",\n"
+			if !result.status {
+				expected := result.expected
+				buffer = tab(buffer, nest+1)
+				buffer = buffer + "\"expected\": [\n"
+				for _, elm := range expected {
+					buffer = tab(buffer, nest+2)
+					buffer = buffer + "\"" + elm + "\",\n"
+					buffer = tab(buffer, nest+1)
+					buffer = buffer + "],\n"
+				}
 			}
-
-			buffer = tab(buffer, nest+1)
-			buffer = buffer + "],\n"
 		}
 
 		buffer = tab(buffer, nest)
