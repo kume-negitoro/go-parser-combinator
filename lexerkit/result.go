@@ -5,16 +5,16 @@ import (
 	"strings"
 )
 
-type ResultTypes string
+type ResultType string
 
 const (
-	Container ResultTypes = "container"
-	Content   ResultTypes = "content"
+	Container ResultType = "container"
+	Content   ResultType = "content"
 )
 
 type Result struct {
 	name       string
-	resultType ResultTypes
+	resultType ResultType
 	status     bool
 	index      int
 	expected   []string
